@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual Environment
+venv/
+env/
+.env
+
+# Data & Models
+*.csv
+models/*.pkl
+models/*.db
+
+# IDEs
+.idea/
+.vscode/
+.DS_Store
