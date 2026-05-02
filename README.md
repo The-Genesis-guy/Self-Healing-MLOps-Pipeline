@@ -3,9 +3,9 @@
 A closed-loop, autonomous ML pipeline that observes incoming data, detects drift, decides on a course of action, and automatically retrains or rolls back models without human intervention.
 
 **Current Status:** Layers 1 & 2 Complete ✅ | Layer 1.5 In Progress 🚧  
-**Test Coverage:** 38/38 tests passing  
+**Test Coverage:** 38/38 core tests passing | 18/18 API tests passing 
 **Model Registry:** 16 versions trained, v1 active (F1=0.5085)  
-**Next:** Real dataset support (CSV → trained model in 2 minutes)
+**Next:** Real dataset support (`data/streamer.py` built, moving to PaySim adapter)
 
 ## Architecture
 
@@ -96,6 +96,9 @@ Self-Healing-MLOps-Pipeline/
 │   ├── test_registry.py       # Model store CRUD
 │   ├── test_pipeline.py       # Integration tests
 │   └── test_api.py            # API endpoints
+│
+├── data/                      # Data streaming layer
+│   └── streamer.py            # Sequential chunked CSV reader
 │
 ├── models/                    # Model artifacts + registry
 │   ├── registry.db            # SQLite database

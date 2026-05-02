@@ -1,6 +1,14 @@
 # Layer 1 — Complete Documentation
 ## Self-Healing MLOps Pipeline
 
+> **[LATEST UPDATE - KAGGLE PAYSIM SIMULATION]**
+> Since this document was originally written, Layer 1 has undergone massive architectural upgrades to support the 6.3 Million row Kaggle PaySim simulation:
+> 1. **Scikit-Learn Pipelines:** The ML core (`core/model.py`) now uses pure `sklearn.pipeline.Pipeline`. It automatically applies `SimpleImputer` (median/most_frequent) and `OneHotEncoder` mathematically, eliminating data leakage and ensuring production data is scored exactly like training data.
+> 2. **Domain Agnosticism:** The hardcoded `FraudAdapter` has been ripped out. The engine now uses dependency injection, accepting *any* class that inherits from `BaseAdapter`. This allows the exact same code to process Kaggle Fraud data, Churn data, or Medical data without changing a single line in Layer 1.
+> 3. **Memory Streaming:** The `DataStreamer` was built to pipe data into Layer 1 in memory-safe 100,000-row chunks.
+
+
+
 ---
 
 ## What Layer 1 Is

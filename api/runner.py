@@ -7,7 +7,6 @@ from core.drift import calculate_drift
 from core.healer import Healer
 from core.retrainer import Retrainer
 from core.registry import ModelRegistry
-from adapters.fraud import FraudAdapter
 from config import LOOP_INTERVAL_SECONDS, MAX_RETRAIN_ATTEMPTS
 from api.state import pipeline_state
 
@@ -15,9 +14,7 @@ _stop_event = threading.Event()
 _thread: threading.Thread = None
 
 
-def _loop(scenario: str, adapter_class=None):
-    from adapters.fraud import FraudAdapter
-    adapter = (adapter_class or FraudAdapter)(scenario=scenario)
+def _loop(adapter):
     registry = ModelRegistry(db_path=adapter.registry_path)
     healer = Healer()
     retrainer = Retrainer(
@@ -93,12 +90,12 @@ def _loop(scenario: str, adapter_class=None):
     pipeline_state.update(running=False)
 
 
-def start(scenario: str = 'normal', adapter_class=None):
+def start(adapter):
     global _thread
     if pipeline_state.running:
         return False   # already running
     _stop_event.clear()
-    _thread = threading.Thread(target=_loop, args=(scenario, adapter_class), daemon=True)
+    _thread = threading.Thread(target=_loop, args=(adapter,), daemon=True)
     _thread.start()
     return True
 

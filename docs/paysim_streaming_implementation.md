@@ -50,10 +50,10 @@ Once the adapter hands the data to `core/model.py`, the `scikit-learn` Pipeline 
 To simulate a real-world production environment chronologically, we will build three specific components:
 
 ### A. The Time Machine (`data/streamer.py`)
-Because the dataset is ~500MB, we cannot load it all into RAM. The dataset has a `step` column representing 1 hour of time.
-*   **Chunked Reading:** Uses Pandas to read data in chunks, avoiding memory overflow.
-*   **Batch Aggregation:** `get_next_batch()` accumulates 24 hours (1 day) of data at a time to ensure there are enough fraud cases to train a valid model.
-*   **Memory Management:** Explicitly calls `gc.collect()` after processing each batch to prevent memory leaks during the simulation.
+Because the dataset is ~500MB, we cannot load it all into RAM.
+*   **Sequential Row Chunking:** Uses Pandas to stream data in sequential chunks (e.g., 100,000 rows at a time). This perfectly mimics an infinite stream of unseen production data without the need to calculate complex time windows.
+*   **Zero-Fraud Protection:** The streamer ensures that every chunk has enough target cases (fraud) to train the model, automatically appending chunks if necessary.
+*   **Memory Management:** Explicitly calls `gc.collect()` after processing each batch to prevent memory leaks during the continuous pipeline loop.
 
 ### B. The PaySim Adapter (`adapters/paysim.py`)
 Adheres strictly to the `BaseAdapter` contract.
@@ -70,10 +70,10 @@ The "Factory Manager" script that runs the entire demonstration.
 
 ## 4. Implementation Phases
 
-**Phase 1: Build the Data Streamer**
-*   Create `data/streamer.py`.
-*   Implement chunked CSV reading, batch aggregation (24h windows), and memory clearing.
-*   Implement fallback logic for zero-fraud batches (keep pulling days until fraud cases > 10).
+**Phase 1: Build the Data Streamer (COMPLETE ✅)**
+*   Created `data/streamer.py`.
+*   Implemented sequential chunked CSV reading using Pandas iterators and garbage collection.
+*   Implemented dynamic zero-fraud fallback logic (`min_positive_cases`) to prevent `RandomForest` training crashes.
 
 **Phase 2: Build the Adapter**
 *   Create `adapters/paysim.py`.
@@ -104,26 +104,44 @@ This proves that you haven't just trained a random forest on a CSV—you have bu
 
 Here is the exact step-by-step code breakdown we will use to implement the 3 phases.
 
-### Phase 1: `data/streamer.py`
+### Phase 1: `data/streamer.py` (COMPLETE ✅)
 The streamer uses Pandas chunking to read exactly the rows it needs without blowing up memory.
 ```python
 import pandas as pd
 import gc
 
 class DataStreamer:
-    def __init__(self, csv_path: str, chunk_size: int = 50000):
+    def __init__(self, csv_path: str, chunk_size: int = 100000):
         self.csv_path = csv_path
         self.chunk_size = chunk_size
-        self.current_step = 1
+        self.iterator = pd.read_csv(csv_path, chunksize=chunk_size)
+        self.current_batch_number = 0
 
-    def get_next_batch(self, batch_hours: int = 24, min_fraud_cases: int = 10) -> pd.DataFrame:
-        """
-        Reads chunks of the CSV, accumulating rows where `step` falls within our target window.
-        If the 24-hour window doesn't have enough fraud cases to train on, it keeps pulling days.
-        """
-        # Logic to iterate through CSV chunks and filter by self.current_step
-        # ...
-        # After returning, call gc.collect() to clear memory.
+    def get_next_batch(self, target_column: str = None, min_positive_cases: int = 10) -> pd.DataFrame:
+        accumulated_chunks = []
+        positive_count = 0
+        
+        try:
+            while True:
+                batch = next(self.iterator)
+                accumulated_chunks.append(batch)
+                
+                if target_column and target_column in batch.columns:
+                    positive_count += batch[target_column].sum()
+                    if positive_count >= min_positive_cases:
+                        break
+                else:
+                    break
+                
+            self.current_batch_number += len(accumulated_chunks)
+            final_batch = pd.concat(accumulated_chunks, ignore_index=True)
+            gc.collect()
+            return final_batch
+            
+        except StopIteration:
+            if accumulated_chunks:
+                return pd.concat(accumulated_chunks, ignore_index=True)
+            raise ValueError("End of streaming data reached.")
 ```
 
 ### Phase 2: `adapters/paysim.py`

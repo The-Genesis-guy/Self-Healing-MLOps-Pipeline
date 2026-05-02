@@ -7,9 +7,12 @@ from api.schemas import PipelineStatusResponse, ActionResponse
 
 router = APIRouter(prefix="/pipeline", tags=["Pipeline"])
 
+from adapters.fraud import FraudAdapter
+
 @router.post("/start", response_model=ActionResponse)
 def start_pipeline(scenario: str = "normal"):
-    started = runner.start(scenario=scenario)
+    adapter = FraudAdapter(scenario=scenario)
+    started = runner.start(adapter=adapter)
     if started:
         return ActionResponse(success=True, message=f"Pipeline started with scenario='{scenario}'")
     return ActionResponse(success=False, message="Pipeline is already running")

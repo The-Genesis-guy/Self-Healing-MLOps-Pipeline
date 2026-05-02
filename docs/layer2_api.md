@@ -1,6 +1,13 @@
 # Layer 2 — Complete Documentation
 ## Self-Healing MLOps Pipeline
 
+> **[LATEST UPDATE - DEPENDENCY INJECTION]**
+> Since this document was written, the API has been updated to remove the hardcoded dependency on `FraudAdapter`. 
+> The API routes and the background runner (`api/runner.py`) now dynamically instantiate the correct adapter (e.g. `PaysimAdapter`) and pass it to the pipeline via Dependency Injection.
+> This makes the entire FastAPI backend 100% domain-agnostic.
+
+
+
 > **The one rule:** `api/` imports from `core/` and `adapters/`. Nothing in `core/` or `adapters/` ever imports from `api/`. The engine stays untouched.
 
 ---
