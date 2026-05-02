@@ -14,6 +14,8 @@ class PipelineState:
     last_drifted_features: list = field(default_factory=list)
     active_model_version: Optional[int] = None
     active_model_f1: Optional[float] = None
+    shadow_model_version: Optional[int] = None
+    health: str = "healthy"  # "healthy" | "warning" | "critical"
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def update(self, **kwargs):
@@ -32,6 +34,7 @@ class PipelineState:
                 "last_drifted_features": self.last_drifted_features,
                 "active_model_version": self.active_model_version,
                 "active_model_f1": self.active_model_f1,
+                "health": self.health,
             }
 
 # Single global instance — imported by routes and runner

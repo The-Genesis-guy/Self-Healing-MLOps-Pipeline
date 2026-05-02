@@ -3,7 +3,8 @@
 from fastapi import APIRouter
 from api import runner
 from api.state import pipeline_state
-from api.schemas import PipelineStatusResponse, ActionResponse
+from api.schemas import PipelineStatusResponse, ActionResponse, HistoryEntryResponse
+from core.history import HistoryLogger
 
 router = APIRouter(prefix="/pipeline", tags=["Pipeline"])
 
@@ -25,3 +26,9 @@ def stop_pipeline():
 @router.get("/status", response_model=PipelineStatusResponse)
 def get_status():
     return PipelineStatusResponse(**pipeline_state.snapshot())
+
+@router.get("/history", response_model=list[HistoryEntryResponse])
+def get_history(limit: int = 100):
+    history = HistoryLogger()
+    entries = history.get_recent(limit=limit)
+    return [HistoryEntryResponse(**e.__dict__) for e in entries]

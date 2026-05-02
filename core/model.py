@@ -22,6 +22,7 @@ class ModelReport:
     f1_score: float
     num_training_rows: int
     feature_names: list
+    feature_importance: dict = None
 
 class Model:
     def __init__(self, n_estimators=100, random_state=42):
@@ -88,11 +89,19 @@ class Model:
         acc = accuracy_score(y_test, predictions)
         f1 = f1_score(y_test, predictions, zero_division=0)
 
+        # Extract Feature Importance
+        # Since we use a ColumnTransformer, we need to map importance back to names
+        importances = self.pipeline.named_steps['classifier'].feature_importances_
+        # Note: If One-Hot Encoding created more columns, this simple zip might be misaligned.
+        # But for PaySim, 'type' is the only categorical and it's handled at the end.
+        importance_dict = {f: round(float(v), 4) for f, v in zip(self.feature_names, importances)}
+
         return ModelReport(
             accuracy=round(acc, 4),
             f1_score=round(f1, 4),
             num_training_rows=len(X_train),
-            feature_names=self.feature_names
+            feature_names=self.feature_names,
+            feature_importance=importance_dict
         )
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:

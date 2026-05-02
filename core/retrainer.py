@@ -63,8 +63,8 @@ class Retrainer:
         # --- Step 5: Register it in the registry (not active yet) ---
         record = self.registry.register(
             path=model_path,
-            accuracy=report.accuracy,
-            f1_score=report.f1_score
+            f1_score=report.f1_score,
+            feature_importance=report.feature_importance
         )
 
         # --- Step 6: Compare and decide whether to promote ---

@@ -1,122 +1,127 @@
-# pipeline.py
-
-import time
 import logging
+import time
 import pandas as pd
-from core.adapter import BaseAdapter
+from sklearn.metrics import f1_score
 from core.drift import calculate_drift
 from core.healer import Healer
 from core.retrainer import Retrainer
 from core.registry import ModelRegistry
+from core.model import Model
+from core.history import HistoryLogger
+from core.validator import DataValidator
 from config import LOOP_INTERVAL_SECONDS, MAX_RETRAIN_ATTEMPTS
 
 logger = logging.getLogger(__name__)
 
-
-def run_pipeline(adapter: BaseAdapter, max_iterations: int = 3):
+def run_pipeline(adapter, max_iterations=None):
     """
-    The main loop. Completely domain-agnostic.
-    Pass any adapter and it works.
-
-    Examples:
-        run_pipeline(adapter=FraudAdapter(scenario='foreign'))
-        run_pipeline(adapter=ChurnAdapter())
-        run_pipeline(adapter=CreditRiskAdapter(scenario='recession'))
+    The unified Self-Healing Loop.
+    Supports Shadow Deployment, Safe Mode, and Persistence.
     """
-    logger.info("=" * 60)
-    logger.info("  Self-Healing MLOps Pipeline — Starting")
-    logger.info(f"  Adapter : {adapter.__class__.__name__}")
-    logger.info("=" * 60)
-
     registry = ModelRegistry(db_path=adapter.registry_path)
     healer = Healer()
     retrainer = Retrainer(
         registry=registry,
         categorical_columns=adapter.categorical_columns
     )
+    history = HistoryLogger()
+    validator = DataValidator()
     baseline = adapter.load_baseline()
 
     iteration = 0
     consecutive_failed_retrains = 0
+    
+    shadow_version = None
+    shadow_model = None
 
     while True:
         iteration += 1
+        if max_iterations and iteration > max_iterations:
+            break
+            
         logger.info(f"\n--- Iteration {iteration} ---")
 
         # --- OBSERVE ---
         active = registry.get_active()
         if active is None:
-            logger.error("[ERROR] No active model. Run training first.")
+            logger.error("[ERROR] No active model.")
             break
         logger.info(f"[OBSERVE] Active model: v{active.version} | F1={active.f1_score}")
 
         current_data = adapter.get_current_data()
+        
+        # --- VALIDATE ---
+        valid = validator.validate(current_data, target_column=adapter.target_column)
+        if not valid.is_valid:
+            logger.error(f"[ERROR]   🚨 DATA QUALITY ALERT: {valid.reason}")
+            history.log(iteration, active.version, active.f1_score, 0.0, "alert", valid.reason)
+            break
+
+        # --- SHADOW TRIAL ---
+        if shadow_version and shadow_model:
+            y_true = current_data[adapter.target_column]
+            X = current_data.drop(columns=[adapter.target_column])
+            
+            active_model_obj = Model.load(active.path)
+            active_preds = active_model_obj.predict(X)
+            active_f1_new = f1_score(y_true, active_preds, zero_division=0)
+            
+            shadow_preds = shadow_model.predict(X)
+            shadow_f1_new = f1_score(y_true, shadow_preds, zero_division=0)
+            
+            if shadow_f1_new > active_f1_new:
+                logger.info(f"[ACT]     ✅ Shadow v{shadow_version} beat Active v{active.version}. Promoting!")
+                registry.set_active(shadow_version)
+                history.log(iteration, shadow_version, shadow_f1_new, 0.0, "promote", "Shadow trial win.")
+            else:
+                logger.info(f"[ACT]     ❌ Shadow v{shadow_version} failed trial. Discarding.")
+                history.log(iteration, active.version, active_f1_new, 0.0, "discard", "Shadow trial loss.")
+            
+            shadow_version = None
+            shadow_model = None
+            active = registry.get_active()
 
         # --- COMPARE ---
-        # Drop target — never available on live incoming data
         drift_reports = calculate_drift(
             baseline.drop(columns=[adapter.target_column]),
             current_data.drop(columns=[adapter.target_column]),
             categorical_columns=adapter.categorical_columns
         )
-
-        drifted = [f for f, r in drift_reports.items() if r.drifted]
-        logger.info(f"[COMPARE] Drifted features: {drifted if drifted else 'none'}")
+        max_drift = max([r.psi_score for r in drift_reports.values()]) if drift_reports else 0
 
         # --- DECIDE ---
         decision = healer.decide(drift_reports, current_f1=active.f1_score)
-        level = logging.WARNING if decision.action != 'none' else logging.INFO
-        logger.log(level, f"[DECIDE]  Action={decision.action} | {decision.reason}")
-
+        
         # --- ACT ---
         if decision.action == 'retrain':
             if consecutive_failed_retrains >= MAX_RETRAIN_ATTEMPTS:
-                logger.warning(f"[ACT]     ⏸️  Retrain suppressed — {MAX_RETRAIN_ATTEMPTS} consecutive failures.")
-                logger.warning(f"[ACT]     🚨 HUMAN INTERVENTION REQUIRED — drift cannot be resolved automatically.")
-
+                logger.error("[ERROR]   🚨 SAFE MODE: Retraining failed 3 times.")
+                history.log(iteration, active.version, active.f1_score, max_drift, "safe_mode", "Retraining failed 3 times. Entering Safe Mode.")
+                break
             else:
-                logger.info("[ACT]     Retraining on current data...")
-                result = retrainer.retrain(current_data, target_column=adapter.target_column)
-                if result.promoted:
+                retrain_res = retrainer.retrain(current_data, target_column=adapter.target_column)
+                if retrain_res.promoted:
+                    shadow_version = retrain_res.new_version
+                    record = registry.get_by_version(shadow_version)
+                    shadow_model = Model.load(record.path)
+                    logger.info(f"[ACT]     🟡 Model v{shadow_version} in Shadow Trial.")
+                    history.log(iteration, active.version, active.f1_score, max_drift, "shadow", f"v{shadow_version} candidate.")
                     consecutive_failed_retrains = 0
-                    logger.info(f"[ACT]     ✅ New model v{result.new_version} promoted. F1: {result.old_f1} → {result.new_f1}")
-                    baseline = current_data.copy()
-                    logger.info(f"[ACT]     📐 Baseline updated.")
                 else:
                     consecutive_failed_retrains += 1
-                    logger.warning(f"[ACT]     ❌ Rejected. F1: {result.new_f1} did not beat {result.old_f1}")
-                    logger.warning(f"[ACT]     🔁 Failed attempt {consecutive_failed_retrains}/{MAX_RETRAIN_ATTEMPTS}")
+                    logger.warning(f"[ACT]     🔁 Failed attempt {consecutive_failed_retrains}/3")
+                    history.log(iteration, active.version, active.f1_score, max_drift, "failed_retrain", retrain_res.reason)
 
         elif decision.action == 'rollback':
             all_models = registry.get_all()
             if len(all_models) >= 2:
                 previous = all_models[-2]
                 registry.set_active(previous.version)
-                logger.warning(f"[ACT]     ⏪ Rolled back to v{previous.version} | F1={previous.f1_score}")
-            else:
-                logger.warning("[ACT]     ⚠️  No previous version to roll back to.")
-
-        elif decision.action == 'alert':
-            logger.warning(f"[ACT]     ⚠️  Alert: {decision.reason}")
+                logger.info(f"[ACT]     ⏪ Rolled back to v{previous.version}")
+                history.log(iteration, previous.version, previous.f1_score, max_drift, "rollback", decision.reason)
 
         else:
             consecutive_failed_retrains = 0
-            logger.info("[ACT]     ✅ No action needed.")
-
-        # --- VERIFY ---
-        active_after = registry.get_active()
-        logger.info(f"[VERIFY]  Active model after action: v{active_after.version} | F1={active_after.f1_score}")
-
-        if max_iterations and iteration >= max_iterations:
-            logger.info(f"\nReached {max_iterations} iterations. Stopping.")
-            break
+            history.log(iteration, active.version, active.f1_score, max_drift, decision.action, decision.reason)
 
         time.sleep(LOOP_INTERVAL_SECONDS)
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-    # Change this one line to switch domains
-    from adapters.fraud import FraudAdapter
-    run_pipeline(adapter=FraudAdapter(scenario='normal'), max_iterations=3)
