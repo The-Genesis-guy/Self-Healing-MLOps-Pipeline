@@ -25,7 +25,19 @@ def stop_pipeline():
 
 @router.get("/status", response_model=PipelineStatusResponse)
 def get_status():
-    return PipelineStatusResponse(**pipeline_state.snapshot())
+    snapshot = pipeline_state.snapshot()
+    
+    # If the pipeline isn't running, the state might not have the active model info.
+    # We fetch it directly from the registry for a better initial UI experience.
+    if snapshot["active_model_version"] is None:
+        from core.registry import ModelRegistry
+        registry = ModelRegistry() # defaults to models/registry.db
+        active = registry.get_active()
+        if active:
+            snapshot["active_model_version"] = active.version
+            snapshot["active_model_f1"] = active.f1_score
+            
+    return PipelineStatusResponse(**snapshot)
 
 @router.get("/history", response_model=list[HistoryEntryResponse])
 def get_history(limit: int = 100):
