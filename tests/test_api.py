@@ -57,7 +57,6 @@ def test_list_models_have_required_fields():
         m = models[0]
         assert "version" in m
         assert "f1_score" in m
-        assert "accuracy" in m
         assert "is_active" in m
         assert "trained_at" in m
 

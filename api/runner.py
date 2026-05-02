@@ -26,68 +26,76 @@ def _loop(adapter):
 
     consecutive_failed_retrains = 0
 
-    while not _stop_event.is_set():
-        iteration = pipeline_state.iteration + 1
-        pipeline_state.update(iteration=iteration)
+    try:
+        while not _stop_event.is_set():
+            iteration = pipeline_state.iteration + 1
+            pipeline_state.update(iteration=iteration)
 
-        # OBSERVE
-        active = registry.get_active()
-        if active is None:
-            break
-        pipeline_state.update(
-            active_model_version=active.version,
-            active_model_f1=active.f1_score
-        )
+            # OBSERVE
+            active = registry.get_active()
+            if active is None:
+                break
+            pipeline_state.update(
+                active_model_version=active.version,
+                active_model_f1=active.f1_score
+            )
 
-        # COMPARE — drop target column, we never have labels on live data
-        current_data = adapter.get_current_data()
-        drift_reports = calculate_drift(
-            baseline.drop(columns=[adapter.target_column]),
-            current_data.drop(columns=[adapter.target_column]),
-            categorical_columns=adapter.categorical_columns
-        )
-        drifted = [f for f, r in drift_reports.items() if r.drifted]
+            # COMPARE — drop target column, we never have labels on live data
+            current_data = adapter.get_current_data()
+            drift_reports = calculate_drift(
+                baseline.drop(columns=[adapter.target_column]),
+                current_data.drop(columns=[adapter.target_column]),
+                categorical_columns=adapter.categorical_columns
+            )
+            drifted = [f for f, r in drift_reports.items() if r.drifted]
 
-        # DECIDE
-        decision = healer.decide(drift_reports, current_f1=active.f1_score)
-        pipeline_state.update(
-            last_action=decision.action,
-            last_reason=decision.reason,
-            last_drifted_features=drifted
-        )
+            # DECIDE
+            decision = healer.decide(drift_reports, current_f1=active.f1_score)
+            pipeline_state.update(
+                last_action=decision.action,
+                last_reason=decision.reason,
+                last_drifted_features=drifted
+            )
 
-        # ACT
-        if decision.action == 'retrain':
-            if consecutive_failed_retrains >= MAX_RETRAIN_ATTEMPTS:
-                pass   # suppress — drift acknowledged, monitoring only
-            else:
-                result = retrainer.retrain(current_data, target_column=adapter.target_column)
-                if result.promoted:
-                    consecutive_failed_retrains = 0
-                    baseline = current_data.copy()
-                    pipeline_state.update(
-                        active_model_version=result.new_version,
-                        active_model_f1=result.new_f1
-                    )
+            # ACT
+            if decision.action == 'retrain':
+                if consecutive_failed_retrains >= MAX_RETRAIN_ATTEMPTS:
+                    pass   # suppress — drift acknowledged, monitoring only
                 else:
-                    consecutive_failed_retrains += 1
+                    result = retrainer.retrain(current_data, target_column=adapter.target_column)
+                    if result.promoted:
+                        consecutive_failed_retrains = 0
+                        baseline = current_data.copy()
+                        pipeline_state.update(
+                            active_model_version=result.new_version,
+                            active_model_f1=result.new_f1
+                        )
+                    else:
+                        consecutive_failed_retrains += 1
 
-        elif decision.action == 'rollback':
-            all_models = registry.get_all()
-            if len(all_models) >= 2:
-                previous = all_models[-2]
-                registry.set_active(previous.version)
-                pipeline_state.update(
-                    active_model_version=previous.version,
-                    active_model_f1=previous.f1_score
-                )
+            elif decision.action == 'rollback':
+                all_models = registry.get_all()
+                if len(all_models) >= 2:
+                    previous = all_models[-2]
+                    registry.set_active(previous.version)
+                    pipeline_state.update(
+                        active_model_version=previous.version,
+                        active_model_f1=previous.f1_score
+                    )
 
-        else:
-            consecutive_failed_retrains = 0   # drift cleared — reset counter
+            else:
+                consecutive_failed_retrains = 0   # drift cleared — reset counter
 
-        _stop_event.wait(timeout=LOOP_INTERVAL_SECONDS)
-
-    pipeline_state.update(running=False)
+            _stop_event.wait(timeout=LOOP_INTERVAL_SECONDS)
+            
+    except ValueError as e:
+        # Catch end of streaming data
+        pipeline_state.update(last_reason=str(e))
+    except Exception as e:
+        # Catch any other unexpected crashes
+        pipeline_state.update(last_reason=f"CRASH: {str(e)}")
+    finally:
+        pipeline_state.update(running=False)
 
 
 def start(adapter):

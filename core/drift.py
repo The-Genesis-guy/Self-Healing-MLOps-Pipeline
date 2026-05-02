@@ -28,10 +28,10 @@ def _psi_numerical(baseline: pd.Series, current: pd.Series, buckets: int = 10) -
     baseline_counts = np.histogram(baseline, bins=breakpoints)[0]
     current_counts = np.histogram(current, bins=breakpoints)[0]
 
-    # Convert counts to percentages
-    # Adding 0.0001 avoids division by zero and log(0) which is undefined
-    baseline_pct = (baseline_counts / len(baseline)) + 0.0001
-    current_pct = (current_counts / len(current)) + 0.0001
+    # Convert counts to percentages using Laplace Smoothing
+    # This avoids division by zero and log(0) without using arbitrary hacks.
+    baseline_pct = (baseline_counts + 1) / (len(baseline) + len(baseline_counts))
+    current_pct = (current_counts + 1) / (len(current) + len(current_counts))
 
     # PSI formula: sum of (actual - expected) * ln(actual / expected)
     psi_value = np.sum((baseline_pct - current_pct) * np.log(baseline_pct / current_pct))
@@ -58,9 +58,9 @@ def _psi_categorical(baseline: pd.Series, current: pd.Series) -> tuple:
     current_pct = {}
 
     for cat in all_categories:
-        # What % of each dataset is this category?
-        baseline_pct[cat] = (baseline == cat).mean() + 0.0001
-        current_pct[cat] = (current == cat).mean() + 0.0001
+        # What % of each dataset is this category? (Laplace Smoothed)
+        baseline_pct[cat] = ((baseline == cat).sum() + 1) / (len(baseline) + len(all_categories))
+        current_pct[cat] = ((current == cat).sum() + 1) / (len(current) + len(all_categories))
 
     # Same PSI formula, just over categories instead of buckets
     psi_value = sum(

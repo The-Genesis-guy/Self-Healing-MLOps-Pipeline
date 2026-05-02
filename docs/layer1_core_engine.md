@@ -610,7 +610,10 @@ All commands assume the venv is active (`source venv/bin/activate`).
 
 **Normal — no drift, no action (sanity check):**
 ```bash
-python -c "from pipeline import run_pipeline; run_pipeline(scenario='normal', max_iterations=3)"
+python -c "# Change this one line to switch between Fraud, Churn, or Medical domains
+from adapters.paysim import PaysimAdapter
+
+run_pipeline(adapter=PaysimAdapter(), max_iterations=5)"
 ```
 Expected: all iterations show `Action=none`.
 

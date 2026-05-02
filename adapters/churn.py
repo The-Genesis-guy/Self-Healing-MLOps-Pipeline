@@ -24,7 +24,21 @@ class ChurnAdapter(BaseAdapter):
         return ['contract_type']   # matches what generate_churn_data.py actually creates
 
     def load_baseline(self) -> pd.DataFrame:
-        return pd.read_csv(self.baseline_path)
+        try:
+            return pd.read_csv(self.baseline_path)
+        except FileNotFoundError:
+            # Generate deterministic in-memory mock data so it works without files
+            n = 1000
+            np.random.seed(42)
+            df = pd.DataFrame({
+                'tenure_months': np.random.randint(1, 72, size=n),
+                'monthly_charges': np.random.normal(65, 20, size=n).clip(20, 150),
+                'num_support_calls': np.random.poisson(lam=1, size=n),
+                'contract_type': np.random.choice(['monthly', 'yearly', 'two_year'], size=n, p=[0.5, 0.3, 0.2]),
+                'churned': np.random.choice([0, 1], size=n, p=[0.8, 0.2])
+            })
+            np.random.seed(None)
+            return df
 
     def get_current_data(self) -> pd.DataFrame:
         baseline = self.load_baseline()

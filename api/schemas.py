@@ -15,7 +15,6 @@ class PipelineStatusResponse(BaseModel):
 class ModelResponse(BaseModel):
     version: int
     path: str
-    accuracy: float
     f1_score: float
     trained_at: str
     is_active: bool
