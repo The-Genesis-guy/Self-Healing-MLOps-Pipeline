@@ -46,17 +46,12 @@ class Retrainer:
             old_f1 = active.f1_score
             old_version = active.version
 
-        # --- Step 2: Encode categorical columns ---
-        # Random Forest can't handle strings — convert categories to integer codes
-        # We do this on a copy so we don't mutate the original dataframe
+        # --- Step 2: Pass data to modern Pipeline ---
         df = new_data.copy()
-        for col in self.categorical_columns:
-            if col in df.columns:
-                df[col] = df[col].astype('category').cat.codes
-
+        
         # --- Step 3: Train a fresh model ---
         new_model = Model()
-        report = new_model.train(df, target_column=target_column)
+        report = new_model.train(df, target_column=target_column, categorical_columns=self.categorical_columns)
 
         # --- Step 4: Save the new model to disk ---
         # Ask the registry what version number will be assigned next.

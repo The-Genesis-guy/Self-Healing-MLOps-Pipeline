@@ -7,7 +7,7 @@
 #   python simulate_drift.py foreign
 
 import sys
-from adapters.fraud import load_baseline, simulate_drift, CATEGORICAL_COLUMNS
+from adapters.fraud import FraudAdapter
 from core.drift import calculate_drift
 
 
@@ -15,10 +15,11 @@ def main():
     scenario = sys.argv[1] if len(sys.argv) > 1 else 'normal'
     print(f"\n🔍 Drift report for scenario: '{scenario}'\n")
 
-    baseline = load_baseline()
-    current = simulate_drift(baseline, scenario)
+    adapter = FraudAdapter(scenario=scenario)
+    baseline = adapter.load_baseline()
+    current = adapter.get_current_data()
 
-    reports = calculate_drift(baseline, current, categorical_columns=CATEGORICAL_COLUMNS)
+    reports = calculate_drift(baseline, current, categorical_columns=adapter.categorical_columns)
 
     print(f"{'Feature':<30} {'PSI Score':>10}  {'Status'}")
     print("-" * 55)

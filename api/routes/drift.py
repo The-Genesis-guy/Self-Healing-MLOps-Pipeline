@@ -1,7 +1,7 @@
 # on-demand drift check
 
 from fastapi import APIRouter
-from adapters.fraud import load_baseline, simulate_drift, CATEGORICAL_COLUMNS, TARGET_COLUMN
+from adapters.fraud import FraudAdapter
 from core.drift import calculate_drift
 from api.schemas import DriftReportResponse, DriftFeatureReport
 
@@ -9,13 +9,15 @@ router = APIRouter(prefix="/drift", tags=["Drift"])
 
 @router.get("/check", response_model=DriftReportResponse)
 def check_drift(scenario: str = "normal"):
-    baseline = load_baseline()
-    current = simulate_drift(baseline, scenario)
+    adapter = FraudAdapter(scenario=scenario)
+    baseline = adapter.load_baseline()
+    current = adapter.get_current_data()
+    
     # Drop target — we never have labels on live incoming data
     reports = calculate_drift(
-        baseline.drop(columns=[TARGET_COLUMN]),
-        current.drop(columns=[TARGET_COLUMN]),
-        categorical_columns=CATEGORICAL_COLUMNS
+        baseline.drop(columns=[adapter.target_column]),
+        current.drop(columns=[adapter.target_column]),
+        categorical_columns=adapter.categorical_columns
     )
 
     features = [

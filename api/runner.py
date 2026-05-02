@@ -7,7 +7,7 @@ from core.drift import calculate_drift
 from core.healer import Healer
 from core.retrainer import Retrainer
 from core.registry import ModelRegistry
-from adapters.fraud import CATEGORICAL_COLUMNS, TARGET_COLUMN, load_baseline, simulate_drift
+from adapters.fraud import FraudAdapter
 from config import LOOP_INTERVAL_SECONDS, MAX_RETRAIN_ATTEMPTS
 from api.state import pipeline_state
 
@@ -15,11 +15,16 @@ _stop_event = threading.Event()
 _thread: threading.Thread = None
 
 
-def _loop(scenario: str):
-    registry = ModelRegistry()
+def _loop(scenario: str, adapter_class=None):
+    from adapters.fraud import FraudAdapter
+    adapter = (adapter_class or FraudAdapter)(scenario=scenario)
+    registry = ModelRegistry(db_path=adapter.registry_path)
     healer = Healer()
-    retrainer = Retrainer(registry=registry, categorical_columns=CATEGORICAL_COLUMNS)
-    baseline = load_baseline()
+    retrainer = Retrainer(
+        registry=registry,
+        categorical_columns=adapter.categorical_columns
+    )
+    baseline = adapter.load_baseline()
     pipeline_state.update(running=True, iteration=0)
 
     consecutive_failed_retrains = 0
@@ -38,11 +43,11 @@ def _loop(scenario: str):
         )
 
         # COMPARE — drop target column, we never have labels on live data
-        current_data = simulate_drift(baseline, scenario)
+        current_data = adapter.get_current_data()
         drift_reports = calculate_drift(
-            baseline.drop(columns=[TARGET_COLUMN]),
-            current_data.drop(columns=[TARGET_COLUMN]),
-            categorical_columns=CATEGORICAL_COLUMNS
+            baseline.drop(columns=[adapter.target_column]),
+            current_data.drop(columns=[adapter.target_column]),
+            categorical_columns=adapter.categorical_columns
         )
         drifted = [f for f, r in drift_reports.items() if r.drifted]
 
@@ -59,7 +64,7 @@ def _loop(scenario: str):
             if consecutive_failed_retrains >= MAX_RETRAIN_ATTEMPTS:
                 pass   # suppress — drift acknowledged, monitoring only
             else:
-                result = retrainer.retrain(current_data, target_column=TARGET_COLUMN)
+                result = retrainer.retrain(current_data, target_column=adapter.target_column)
                 if result.promoted:
                     consecutive_failed_retrains = 0
                     baseline = current_data.copy()
@@ -88,12 +93,12 @@ def _loop(scenario: str):
     pipeline_state.update(running=False)
 
 
-def start(scenario: str = 'normal'):
+def start(scenario: str = 'normal', adapter_class=None):
     global _thread
     if pipeline_state.running:
         return False   # already running
     _stop_event.clear()
-    _thread = threading.Thread(target=_loop, args=(scenario,), daemon=True)
+    _thread = threading.Thread(target=_loop, args=(scenario, adapter_class), daemon=True)
     _thread.start()
     return True
 

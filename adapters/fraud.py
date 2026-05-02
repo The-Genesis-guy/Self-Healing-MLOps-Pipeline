@@ -1,46 +1,66 @@
-# Everything domain-specific lives here.
-# To switch domains, add a new adapter file — the core engine stays untouched.
+# adapters/fraud.py
 
 import numpy as np
 import pandas as pd
-
-CATEGORICAL_COLUMNS = ['merchant_category', 'is_foreign']
-TARGET_COLUMN = 'is_fraud'
-BASELINE_PATH = 'data_training.csv'
+from core.adapter import BaseAdapter
 
 
-def load_baseline() -> pd.DataFrame:
-    return pd.read_csv(BASELINE_PATH)
-
-
-def simulate_drift(baseline: pd.DataFrame, scenario: str) -> pd.DataFrame:
+class FraudAdapter(BaseAdapter):
     """
-    Inject synthetic drift to simulate real-world shifts.
-
-    Scenarios:
-    - 'normal'      → data matches baseline, no drift
-    - 'night_shift' → fraud moves to 2am–5am
-    - 'high_value'  → transaction amounts jump to $3000+ range
-    - 'foreign'     → spike in foreign card transactions
+    Fraud detection domain adapter.
+    
+    Swap this out for ChurnAdapter, CreditRiskAdapter, etc.
+    The core engine never changes — only this file does.
     """
-    n = len(baseline)
-    current = baseline.copy()
 
-    if scenario == 'normal':
-        return baseline.sample(n=n, replace=True,
-                               random_state=np.random.randint(0, 9999)).reset_index(drop=True)
+    def __init__(self, scenario: str = 'normal', baseline_path: str = 'data_training.csv'):
+        self.scenario = scenario
+        self.baseline_path = baseline_path
 
-    elif scenario == 'night_shift':
-        current['hour_of_day'] = np.random.choice(range(2, 6), size=n)
-        return current
+    @property
+    def registry_path(self) -> str:
+        return 'models/registry.db'
 
-    elif scenario == 'high_value':
-        current['transaction_amount'] = np.random.exponential(scale=3000, size=n)
-        return current
+    @property
+    def target_column(self) -> str:
+        return 'is_fraud'
 
-    elif scenario == 'foreign':
-        current['is_foreign'] = np.random.choice([0, 1], size=n, p=[0.2, 0.8])
-        current['transaction_amount'] = np.random.exponential(scale=5000, size=n)
-        return current
+    @property
+    def categorical_columns(self) -> list[str]:
+        return ['merchant_category', 'is_foreign']
 
-    return baseline.copy()
+    def load_baseline(self) -> pd.DataFrame:
+        return pd.read_csv(self.baseline_path)
+
+    def get_current_data(self) -> pd.DataFrame:
+        baseline = self.load_baseline()
+        return self._simulate(baseline, self.scenario)
+
+    def _simulate(self, baseline: pd.DataFrame, scenario: str) -> pd.DataFrame:
+        """
+        Inject synthetic drift to simulate real-world shifts.
+        In production, replace this method with a real data source.
+        """
+        n = len(baseline)
+        current = baseline.copy()
+
+        if scenario == 'normal':
+            return baseline.sample(
+                n=n, replace=True,
+                random_state=np.random.randint(0, 9999)
+            ).reset_index(drop=True)
+
+        elif scenario == 'night_shift':
+            current['hour_of_day'] = np.random.choice(range(2, 6), size=n)
+            return current
+
+        elif scenario == 'high_value':
+            current['transaction_amount'] = np.random.exponential(scale=3000, size=n)
+            return current
+
+        elif scenario == 'foreign':
+            current['is_foreign'] = np.random.choice([0, 1], size=n, p=[0.2, 0.8])
+            current['transaction_amount'] = np.random.exponential(scale=5000, size=n)
+            return current
+
+        return baseline.copy()
