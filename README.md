@@ -84,6 +84,16 @@ python3 -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
 python3 -m api
 
 # Backend runs on http://127.0.0.1:8000
+
+### Docker / Local Compose
+
+You can run the backend and dashboard together using `docker-compose` (uses the pinned requirements file):
+
+```bash
+docker compose up --build
+```
+
+The backend will be exposed on `http://localhost:8000` and the dashboard on `http://localhost:5173`.
 ```
 
 #### 3. Start Pipeline Loop

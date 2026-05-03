@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:5173
+    volumes:
+      - ./:/app
+
+  dashboard:
+    image: node:18
+    working_dir: /workspace
+    volumes:
+      - ./dashboard:/workspace
+    ports:
+      - "5173:5173"
+    command: ["/bin/sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0"]
