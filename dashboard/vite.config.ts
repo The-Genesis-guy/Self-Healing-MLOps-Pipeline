@@ -9,11 +9,13 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
+    // Proxy API requests to backend. When running inside Docker Compose
+    // use the `backend` service hostname; when running locally use localhost.
     proxy: {
-      '/pipeline': 'http://localhost:8000',
-      '/models': 'http://localhost:8000',
-      '/drift': 'http://localhost:8000',
-      '/metrics': 'http://localhost:8000',
+      '/pipeline': process.env.DOCKER === 'true' ? 'http://backend:8000' : 'http://localhost:8000',
+      '/models': process.env.DOCKER === 'true' ? 'http://backend:8000' : 'http://localhost:8000',
+      '/drift': process.env.DOCKER === 'true' ? 'http://backend:8000' : 'http://localhost:8000',
+      '/metrics': process.env.DOCKER === 'true' ? 'http://backend:8000' : 'http://localhost:8000',
     }
   }
 })

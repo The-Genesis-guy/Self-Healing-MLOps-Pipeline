@@ -8,12 +8,15 @@ services:
       - ALLOWED_ORIGINS=http://localhost:5173
     volumes:
       - ./:/app
+    command: ["/bin/sh", "-c", "echo Backend available at http://localhost:8000 && uvicorn api.main:app --host 0.0.0.0 --port 8000"]
 
   dashboard:
     image: node:20.19.0
     working_dir: /workspace
     volumes:
       - ./dashboard:/workspace
+    environment:
+      - DOCKER=true
     ports:
       - "5173:5173"
-    command: ["/bin/sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0"]
+    command: ["/bin/sh", "-c", "echo Dashboard available at http://localhost:5173 && npm ci && npm run dev -- --host 0.0.0.0"]
