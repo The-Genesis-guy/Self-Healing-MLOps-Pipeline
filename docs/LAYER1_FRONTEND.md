@@ -814,6 +814,31 @@ npm run build
 
 ---
 
+## Development & E2E (Playwright)
+
+Run the Vite dev server and use the Playwright smoke tests to validate the UI locally.
+
+1. Install dependencies and start the dashboard:
+
+```bash
+cd dashboard
+npm install
+npm run dev
+```
+
+2. Run the Playwright smoke tests (the tests assume the Vite server is available at `http://127.0.0.1:5173`):
+
+```bash
+# from repo root
+cd dashboard
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:5173 npm run test:e2e
+```
+
+Notes:
+- The dashboard's Vite config proxies API calls (`/pipeline`, `/models`, `/drift`) to `http://localhost:8000` during development.
+- Use `PLAYWRIGHT_BASE_URL` to point tests at the correct dev server URL (Vite may choose a different port if 5173 is occupied).
+
+
 ## Common Issues & Solutions
 
 ### Charts Not Rendering

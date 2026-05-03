@@ -142,6 +142,21 @@ def _loop(adapter):
             history.log(iteration, active.version, active.f1_score, 0.0, 
                        "alert", f"DATA QUALITY: {valid.issues[0]}")
             _stop_event.wait(timeout=LOOP_INTERVAL_SECONDS)
+
+        ## Developer: Simulation & Diagnostics
+
+        You can run a local simulator to generate pipeline events and exercise the full loop without external data sources.
+
+        ```bash
+        # Run the built-in PaySim simulator which seeds models and runs the pipeline
+        python3 run_paysim_simulation.py
+        ```
+
+        Key operational notes:
+        - The pipeline enters `safe_mode` (circuit breaker) after `MAX_RETRAIN_ATTEMPTS` failed retrains (default 3).
+        - Retraining outcomes are recorded in the `models/` folder and the registry; successful retrains create a shadow candidate which enters an A/B shadow trial before promotion.
+        - History events are persisted to `models/history.db` for audit and dashboard visualization.
+
             continue
         
         # === STEP 3: SHADOW TRIAL CHECK ===

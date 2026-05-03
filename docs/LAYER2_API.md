@@ -158,6 +158,17 @@ app.add_middleware(
 # Routes
 app.include_router(pipeline_router, prefix="/pipeline")
 app.include_router(models_router, prefix="/models")
+
+### Convenience entrypoint
+
+The repository includes `api/__main__.py` which wraps `uvicorn` so you can start the API with:
+
+```bash
+# from repo root
+python3 -m api
+```
+
+This is equivalent to running `python3 -m uvicorn api.main:app --host 127.0.0.1 --port 8000`.
 ```
 
 ### Startup & Shutdown Events
@@ -575,6 +586,33 @@ No explicit locks needed because:
 3. No complex concurrent modifications
 
 ---
+
+## Developer: Running the API & Tests
+
+Install backend dependencies and run the API locally:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Start API (convenience wrapper)
+python3 -m api
+
+# or start directly with Uvicorn
+python3 -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Run the backend end-to-end tests locally:
+
+```bash
+pytest -q tests/e2e
+```
+
+Notes:
+- `requirements.txt` includes `httpx` which is required by `fastapi.testclient` and some tests.
+- The CI workflow (`.github/workflows/ci.yml`) starts the backend with a background `uvicorn` command and installs Playwright browsers before running the dashboard tests.
+
 
 ## Database Design
 

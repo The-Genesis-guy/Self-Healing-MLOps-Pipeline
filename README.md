@@ -2,6 +2,8 @@
 
 A production-grade, autonomous machine learning operations platform with real-time drift detection, automated model healing, and intelligent model promotion through shadow trials.
 
+[![CI](https://github.com/The-Genesis-guy/Self-Healing-MLOps-Pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/The-Genesis-guy/Self-Healing-MLOps-Pipeline/actions/workflows/ci.yml)
+
 ## 🎯 Project Overview
 
 GUARDIAN implements a **self-healing machine learning pipeline** that continuously monitors model performance and data drift, automatically retrains degraded models, and safely promotes improvements through A/B testing (shadow trials). The system operates 24/7 with zero human intervention while providing comprehensive visibility through an interactive React dashboard.
