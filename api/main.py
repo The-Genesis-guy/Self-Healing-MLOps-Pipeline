@@ -7,7 +7,8 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Summary
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Summary, REGISTRY
+from prometheus_client.parser import text_string_to_metric_families
 from api.routes import pipeline, models, drift
 
 # Load environment variables from .env if present
@@ -53,6 +54,43 @@ async def metrics_middleware(request: Request, call_next):
 def metrics():
     """Expose Prometheus metrics."""
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+@app.get("/metrics/json")
+def metrics_json():
+    """Return Prometheus metrics as structured JSON for dashboard consumption.
+
+    The response contains a list of metric families with their samples.
+    """
+    # generate_latest returns bytes
+    raw = generate_latest(REGISTRY).decode("utf-8")
+    families = text_string_to_metric_families(raw)
+
+    out = []
+    for fam in families:
+        fam_obj = {
+            "name": fam.name,
+            "type": fam.type,
+            "help": fam.documentation,
+            "samples": [],
+        }
+        for sample in fam.samples:
+            # sample is a tuple: (name, labels, value)
+            try:
+                s_name, s_labels, s_value = sample.name, sample.labels, sample.value
+            except Exception:
+                # fallback for older parser tuple form
+                s_name, s_labels, s_value = sample[0], sample[1], sample[2]
+
+            fam_obj["samples"].append({
+                "name": s_name,
+                "labels": s_labels,
+                "value": float(s_value),
+            })
+
+        out.append(fam_obj)
+
+    return {"metrics": out}
 
 
 @app.get("/")
