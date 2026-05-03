@@ -10,6 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy only python requirements first for caching
 COPY requirements-pinned.txt ./
+# Increase pip timeout and upgrade pip tooling to improve large wheel downloads
+ENV PIP_DEFAULT_TIMEOUT=100
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir -r requirements-pinned.txt
 
 # Copy application code
