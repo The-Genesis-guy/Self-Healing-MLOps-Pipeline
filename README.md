@@ -191,6 +191,10 @@ Self-Healing-MLOps-Pipeline/
 
 ## 🧪 Testing
 
+Automated checks now run in GitHub Actions on every push and pull request:
+- Backend e2e tests in `tests/e2e/`
+- Dashboard Playwright smoke tests in `dashboard/tests/e2e/`
+
 ```bash
 pytest tests/ -v
 # Coverage report: pytest tests/ --cov=core --cov=api
