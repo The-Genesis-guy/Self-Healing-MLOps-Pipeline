@@ -74,10 +74,14 @@ pip install -r requirements.txt
 
 #### 2. Start Backend
 ```bash
-# Terminal 1: Start FastAPI backend
-python3 -m api.main
+# Terminal 1: Start FastAPI backend (recommended)
+python3 -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
 
-# Backend runs on http://localhost:8000
+# Alternative: run as a module (convenience wrapper)
+# This will start Uvicorn for you: `python -m api`
+python3 -m api
+
+# Backend runs on http://127.0.0.1:8000
 ```
 
 #### 3. Start Pipeline Loop
