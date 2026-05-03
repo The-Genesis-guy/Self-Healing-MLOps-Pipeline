@@ -40,7 +40,7 @@ FastAPI backend with RESTful endpoints and data schemas.
 - `/pipeline/status` - Real-time pipeline state
 - `/pipeline/history` - Persistent event log
 - `/models` - Model registry and version management
-- `/pipeline/drift` - Feature drift analysis
+- `/drift/check` - Feature drift analysis
 - `/metrics` - Prometheus text exposition for external scraping
 - `/metrics/json` - Structured metrics payload for the dashboard
 - Type-safe Pydantic schemas
@@ -88,6 +88,7 @@ python3 -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
 python3 -m api
 
 # Backend runs on http://127.0.0.1:8000
+```
 
 ### Docker / Local Compose
 

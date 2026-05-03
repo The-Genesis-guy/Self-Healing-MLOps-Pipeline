@@ -115,7 +115,7 @@ api/
     ├── __init__.py
     ├── pipeline.py         # /pipeline/* endpoints
     ├── models.py           # /models endpoints
-    └── drift.py            # /pipeline/drift endpoint (future)
+    └── drift.py            # /drift/check endpoint
 
 Key Files:
 - main.py: 50 lines, app setup & startup/shutdown events
@@ -430,6 +430,29 @@ GET /metrics/json
                     "value": 76
                 }
             ]
+        }
+    ]
+}
+```
+
+### 7. GET /drift/check
+
+**Purpose**: Run an on-demand drift check for a scenario
+
+**Request**:
+```http
+GET /drift/check?scenario=normal
+```
+
+**Response** (200 OK):
+```json
+{
+    "scenario": "normal",
+    "features": [
+        {
+            "feature": "amount",
+            "psi_score": 0.12,
+            "drifted": false
         }
     ]
 }
