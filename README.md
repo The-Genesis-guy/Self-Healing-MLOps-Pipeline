@@ -16,6 +16,7 @@ GUARDIAN implements a **self-healing machine learning pipeline** that continuous
 - **Drift Detection**: Statistical PSI-based feature drift detection across all features
 - **Multi-Model Registry**: Version history with automatic promotion and rollback
 - **Explainability**: Feature importance visualization and actionable decision reasoning
+- **Prometheus Observability**: `/metrics` for scraping and `/metrics/json` for dashboard summaries
 - **Production Ready**: SQLite persistence, FastAPI backend, React 19 frontend, containerizable
 
 ---
@@ -29,6 +30,7 @@ React 19 + TypeScript + Vite frontend providing real-time visualization and cont
 - 6 feature-rich pages (Dashboard, Drift Radar, Models, Performance, Alerts, Logs)
 - Live metrics and charts with Recharts
 - Pipeline control panel (start/stop, adapter/scenario selection)
+- Prometheus metrics feed panel sourced from `/metrics/json`
 - Intelligent log aggregation for stable periods
 
 **→ [Detailed Documentation](./docs/LAYER1_FRONTEND.md)**
@@ -39,6 +41,8 @@ FastAPI backend with RESTful endpoints and data schemas.
 - `/pipeline/history` - Persistent event log
 - `/models` - Model registry and version management
 - `/pipeline/drift` - Feature drift analysis
+- `/metrics` - Prometheus text exposition for external scraping
+- `/metrics/json` - Structured metrics payload for the dashboard
 - Type-safe Pydantic schemas
 
 **→ [Detailed Documentation](./docs/LAYER2_API.md)**
@@ -60,7 +64,7 @@ Autonomous decision-making and model training engine.
 
 ### Prerequisites
 - Python 3.9+
-- Node.js 18+
+- Node.js 20.19+
 - Git
 
 ### Installation & Running
@@ -87,14 +91,13 @@ python3 -m api
 
 ### Docker / Local Compose
 
-You can run the backend and dashboard together using `docker-compose` (uses the pinned requirements file):
+You can run the backend and dashboard together using `docker compose` (uses the pinned requirements file and Node 20.19 for the dashboard container):
 
 ```bash
 docker compose up --build
 ```
 
 The backend will be exposed on `http://localhost:8000` and the dashboard on `http://localhost:5173`.
-```
 
 #### 3. Start Pipeline Loop
 ```bash
@@ -158,6 +161,8 @@ npm install && npm run dev
 GET /pipeline/status         → Current pipeline state
 GET /pipeline/history        → Event log (2,120+ entries)
 GET /models                  → Model registry with versions
+GET /metrics/json            → Prometheus metrics as JSON for the dashboard
+GET /metrics                 → Prometheus scrape endpoint
 POST /pipeline/start         → Start pipeline loop
 POST /pipeline/stop          → Stop pipeline loop
 ```

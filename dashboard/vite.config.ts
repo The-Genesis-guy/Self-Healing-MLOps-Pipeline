@@ -13,6 +13,7 @@ export default defineConfig({
       '/pipeline': 'http://localhost:8000',
       '/models': 'http://localhost:8000',
       '/drift': 'http://localhost:8000',
+      '/metrics': 'http://localhost:8000',
     }
   }
 })

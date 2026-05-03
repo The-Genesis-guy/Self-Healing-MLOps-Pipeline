@@ -32,6 +32,7 @@ The API layer sits between the frontend dashboard and the core pipeline logic. I
 3. **State Management**: Shared state between API and pipeline loop
 4. **Data Persistence**: SQLite database for history and model registry
 5. **Request Validation**: Pydantic schemas for type safety
+6. **Observability**: Prometheus scrape endpoint plus a JSON view for the dashboard
 
 ### Communication Flow
 
@@ -46,6 +47,7 @@ The API layer sits between the frontend dashboard and the core pipeline logic. I
 │       FastAPI Backend (Layer 2)       │
 │  - /pipeline endpoints                │
 │  - /models endpoints                  │
+│  - /metrics + /metrics/json           │
 │  - Global state management            │
 └────────┬─────────────────────────────┘
          │ Function calls
@@ -382,7 +384,68 @@ async def get_models():
 
 ---
 
-### 4. POST /pipeline/start
+### 4. GET /metrics
+
+**Purpose**: Expose Prometheus text format for external scraping
+
+**Request**:
+```http
+GET /metrics
+```
+
+**Response**:
+- Prometheus exposition format
+- Includes default Python process metrics and `api_request_latency_seconds`
+
+**Implementation**:
+```python
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+```
+
+---
+
+### 5. GET /metrics/json
+
+**Purpose**: Return structured Prometheus metrics for the dashboard UI
+
+**Request**:
+```http
+GET /metrics/json
+```
+
+**Response** (200 OK):
+```json
+{
+    "metrics": [
+        {
+            "name": "api_request_latency_seconds",
+            "type": "summary",
+            "help": "API request latency in seconds",
+            "samples": [
+                {
+                    "name": "api_request_latency_seconds_count",
+                    "labels": { "path": "/pipeline/status" },
+                    "value": 76
+                }
+            ]
+        }
+    ]
+}
+```
+
+**Dashboard Usage**:
+- The React dashboard polls this endpoint every 2 seconds alongside `/pipeline/status`, `/pipeline/history`, and `/models`.
+- It displays a compact metrics feed with family count, sample count, request count, and derived average latency.
+
+**Implementation Notes**:
+- The JSON response is derived from the Prometheus registry using sample parsing.
+- The endpoint is intentionally read-only and safe to expose to the dashboard.
+
+---
+
+### 6. POST /pipeline/start
 
 **Purpose**: Start the pipeline loop
 

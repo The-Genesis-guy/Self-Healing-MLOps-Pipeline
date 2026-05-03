@@ -25,7 +25,7 @@ This document details the complete frontend architecture, component structure, s
 
 ## Architecture Overview
 
-The frontend is a **single-page application (SPA)** built with React 19 that communicates with the FastAPI backend via REST APIs. The dashboard provides real-time visibility into the pipeline with auto-refreshing metrics every 2 seconds.
+The frontend is a **single-page application (SPA)** built with React 19 that communicates with the FastAPI backend via REST APIs. The dashboard provides real-time visibility into the pipeline with auto-refreshing metrics every 2 seconds and includes a Prometheus metrics summary fed by `/metrics/json`.
 
 ### Design Principles
 
@@ -35,6 +35,7 @@ The frontend is a **single-page application (SPA)** built with React 19 that com
 - **Type Safety**: Full TypeScript coverage with Pydantic-generated interfaces
 - **Performance**: Optimized rendering with React hooks and memoization
 - **Accessibility**: Semantic HTML, proper color contrast, ARIA labels
+- **Observability**: Dashboard summary cards derived from Prometheus JSON metrics
 
 ---
 
@@ -56,6 +57,7 @@ The frontend is a **single-page application (SPA)** built with React 19 that com
 - **Output**: `dist/` folder with `index.html`, CSS, and JS bundles
 - **Minification**: Enabled in production
 - **Chunk Size**: ~760KB minified (single bundle)
+- **Runtime Requirement**: Node.js 20.19+ for the current Vite toolchain
 
 ---
 
@@ -90,6 +92,12 @@ Key Files:
 - usePipeline.ts: API polling & data management
 - types.ts: Interface definitions
 ```
+
+The dashboard polling hook fetches:
+- `/pipeline/status`
+- `/pipeline/history`
+- `/models`
+- `/metrics/json` for Prometheus-derived operational summaries
 
 ---
 
@@ -192,6 +200,7 @@ Key Files:
    - Active Model version
    - F1-Score gauge (circular progress)
    - Last Updated timestamp
+    - Prometheus metrics feed with family count, sample count, request count, and average latency
 
 2. **Left Column**
    - Drift Radar (top 6 features)
@@ -208,6 +217,11 @@ Key Files:
    - System Events (last 5 actions)
 
 **Update Interval**: 2 seconds (auto-refresh)
+
+**Prometheus Integration**:
+- The dashboard does not scrape Prometheus directly.
+- It requests structured JSON from `/metrics/json` and derives UI summaries from the exposed sample data.
+- The raw `/metrics` endpoint remains available for external Prometheus scraping and Grafana-style observability.
 
 ### Page 2: Drift Radar
 

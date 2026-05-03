@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import type { PipelineStatus, HistoryEntry, ModelInfo } from './types';
+import type { PipelineStatus, HistoryEntry, ModelInfo, PrometheusMetricsResponse } from './types';
 
 export function usePipeline() {
   const [status, setStatus] = useState<PipelineStatus | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [driftReports, setDriftReports] = useState<any>(null);
+  const [metrics, setMetrics] = useState<PrometheusMetricsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
@@ -14,11 +15,18 @@ export function usePipeline() {
       const [statusRes, historyRes, modelsRes] = await Promise.all([
         axios.get('/pipeline/status'),
         axios.get('/pipeline/history'),
-        axios.get('/models')
+        axios.get('/models'),
       ]);
       setStatus(statusRes.data);
       setHistory(historyRes.data);
       setModels(modelsRes.data);
+
+      try {
+        const metricsRes = await axios.get('/metrics/json');
+        setMetrics(metricsRes.data);
+      } catch (metricsError) {
+        setMetrics(null);
+      }
       
       // Fetch drift reports if pipeline is running
       if (statusRes.data.running) {
@@ -65,6 +73,7 @@ export function usePipeline() {
     history, 
     models, 
     driftReports,
+    metrics,
     loading, 
     startPipeline, 
     stopPipeline,

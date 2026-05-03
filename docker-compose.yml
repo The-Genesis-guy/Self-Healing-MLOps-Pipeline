@@ -10,7 +10,7 @@ services:
       - ./:/app
 
   dashboard:
-    image: node:18
+    image: node:20.19.0
     working_dir: /workspace
     volumes:
       - ./dashboard:/workspace

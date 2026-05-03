@@ -73,6 +73,12 @@ const formatActionLabel = (action: string) => {
   return action;
 };
 
+const formatLatency = (seconds: number | null) => {
+  if (seconds === null || Number.isNaN(seconds)) return '--';
+  if (seconds < 1) return `${Math.round(seconds * 1000)} ms`;
+  return `${seconds.toFixed(2)} s`;
+};
+
 // Aggregate consecutive "none" actions into a single stability period entry
 interface AggregatedHistoryEntry {
   iteration: number;
@@ -193,7 +199,7 @@ const pageMeta: Record<string, { eyebrow: string; title: string; description: st
 };
 
 const App: React.FC = () => {
-  const { status, history, models, driftReports, loading, startPipeline, stopPipeline } = usePipeline();
+  const { status, history, models, driftReports, metrics, loading, startPipeline, stopPipeline } = usePipeline();
   const [selectedAdapter, setSelectedAdapter] = useState('paysim');
   const [selectedScenario, setSelectedScenario] = useState('normal');
   const [activeNav, setActiveNav] = useState('dashboard');
@@ -243,6 +249,18 @@ const App: React.FC = () => {
   const page = pageMeta[activeNav] ?? pageMeta.dashboard;
   const alertHistory = history.filter((entry) => entry.action !== 'none');
   const driftedHistory = history.filter((entry) => entry.action === 'drift' || entry.action === 'alert' || entry.drift_score >= 0.1);
+  const metricsFamilies = metrics?.metrics ?? [];
+  const metricsFamilyCount = metricsFamilies.length;
+  const metricsSampleCount = metricsFamilies.reduce((total, family) => total + family.samples.length, 0);
+  const latencyFamily = metricsFamilies.find((family) => family.name === 'api_request_latency_seconds');
+  const latencySamples = latencyFamily?.samples ?? [];
+  const requestCount = latencySamples
+    .filter((sample) => sample.name.endsWith('_count'))
+    .reduce((total, sample) => total + sample.value, 0);
+  const requestSum = latencySamples
+    .filter((sample) => sample.name.endsWith('_sum'))
+    .reduce((total, sample) => total + sample.value, 0);
+  const averageLatencyMs = requestCount > 0 ? (requestSum / requestCount) * 1000 : null;
 
   return (
     <div className="app-shell">
@@ -589,6 +607,52 @@ const App: React.FC = () => {
                     {health.label}
                   </span>
                   <span className="status-pill status-pill--muted">Adapter: {selectedAdapter}</span>
+                </div>
+              </article>
+
+              <article className="panel panel--snapshot">
+                <div className="panel__header">
+                  <div>
+                    <div className="panel__eyebrow">Prometheus</div>
+                    <h2 className="panel__title">Metrics Feed</h2>
+                  </div>
+                  <div className="panel__chip panel__chip--muted">/metrics/json</div>
+                </div>
+
+                <div className="snapshot-grid">
+                  <div className="snapshot-card">
+                    <span className="snapshot-card__label">Families</span>
+                    <strong className="snapshot-card__value">{metricsFamilyCount}</strong>
+                  </div>
+                  <div className="snapshot-card">
+                    <span className="snapshot-card__label">Samples</span>
+                    <strong className="snapshot-card__value">{metricsSampleCount}</strong>
+                  </div>
+                  <div className="snapshot-card">
+                    <span className="snapshot-card__label">Requests</span>
+                    <strong className="snapshot-card__value">{requestCount.toLocaleString()}</strong>
+                  </div>
+                  <div className="snapshot-card">
+                    <span className="snapshot-card__label">Avg Latency</span>
+                    <strong className="snapshot-card__value snapshot-card__value--success">
+                      {formatLatency(averageLatencyMs === null ? null : averageLatencyMs / 1000)}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="snapshot-feed">
+                  <div className="snapshot-feed__row">
+                    <span>Primary metric</span>
+                    <strong>{latencyFamily?.help ?? 'API request latency in seconds'}</strong>
+                  </div>
+                  <div className="snapshot-feed__row">
+                    <span>Backend scrape</span>
+                    <strong>{latencyFamily ? 'Live from FastAPI registry' : 'Waiting for metrics'}</strong>
+                  </div>
+                  <div className="snapshot-feed__row">
+                    <span>Endpoint</span>
+                    <strong>GET /metrics/json</strong>
+                  </div>
                 </div>
               </article>
 

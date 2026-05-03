@@ -28,3 +28,20 @@ export interface HistoryEntry {
   action: string;
   reason: string;
 }
+
+export interface PrometheusMetricSample {
+  name: string;
+  labels: Record<string, string>;
+  value: number;
+}
+
+export interface PrometheusMetricFamily {
+  name: string;
+  type: string;
+  help: string;
+  samples: PrometheusMetricSample[];
+}
+
+export interface PrometheusMetricsResponse {
+  metrics: PrometheusMetricFamily[];
+}
