@@ -17,7 +17,7 @@ test.describe('Dashboard UI smoke tests', () => {
     await page.getByRole('button', { name: 'Logs' }).click();
 
     await expect(page.getByRole('heading', { name: 'Recent Activity', level: 2 })).toBeVisible();
-    await expect(page.getByText('Pipeline stable for 100 iterations')).toBeVisible();
-    await expect(page.getByText('Iterations 1062–1161')).toBeVisible();
+    await expect(page.getByText('Timeline of pipeline actions and the latest state changes.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Runtime Context', level: 2 })).toBeVisible();
   });
 });
